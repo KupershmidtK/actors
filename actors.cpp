@@ -44,29 +44,29 @@ class TReadActor : public NActors::TActorBootstrapped<TReadActor> {
 private:
     const NActors::TActorId Writer;
 
-    long MaximumPrimeDevisorActorCount;
+    long long MaximumPrimeDivisorActorCount;
     bool Finish;
 
     void HandleWakeup() {
-        long value;
+        long long value;
         try {
             Cin >> value;   
         } catch(...) {
             Finish = true;
-            if (MaximumPrimeDevisorActorCount == 0)
+            if (MaximumPrimeDivisorActorCount == 0)
                 Send(Writer, std::make_unique<NActors::TEvents::TEvPoisonPill>()); 
             return;
         }
         
-        Register(CreateMaximumPrimeDevisorActor(value, SelfId(), Writer));
-        MaximumPrimeDevisorActorCount++;
+        Register(CreateMaximumPrimeDivisorActor(value, SelfId(), Writer));
+        MaximumPrimeDivisorActorCount++;
 
         Send(SelfId(), std::make_unique<NActors::TEvents::TEvWakeup>());
     }
 
     void HandleDone() {
-        MaximumPrimeDevisorActorCount--;
-        if (Finish && MaximumPrimeDevisorActorCount == 0)
+        MaximumPrimeDivisorActorCount--;
+        if (Finish && MaximumPrimeDivisorActorCount == 0)
             Send(Writer, std::make_unique<NActors::TEvents::TEvPoisonPill>()); 
     }
 
@@ -85,7 +85,7 @@ private:
 
 public:
     TReadActor(NActors::TActorId writer) : Writer(writer) {
-        MaximumPrimeDevisorActorCount = 0;
+        MaximumPrimeDivisorActorCount = 0;
         Finish = false;
     }
 
@@ -129,16 +129,50 @@ TMaximumPrimeDevisorActor
 
 // TODO: напишите реализацию TMaximumPrimeDevisorActor
 
-class TMaximumPrimeDevisorActor : public NActors::TActorBootstrapped<TMaximumPrimeDevisorActor> {
+class TMaximumPrimeDivisorActor : public NActors::TActorBootstrapped<TMaximumPrimeDivisorActor> {
 private:
-    long Value;
+    long long Value;
     NActors::TActorId Reader;
     NActors::TActorId Writer;
 
+    TInstant LastTime;
+
+    bool CheckDuration() {
+        auto now = TInstant::Now();
+        TDuration delta = now - LastTime;
+        return delta < TDuration::MilliSeconds(10);
+    }
+
+    long long MinPrimeDivisor() {
+        if (Value == 1) return 1;
+        if (Value % 2 == 0) return 2;
+        if (Value % 3 == 0) return 3;
+
+        long long bound = (long long) sqrt(Value);
+        for (long long i = 5; i <= bound; i += 6) {
+            if(Value % i == 0) return i;
+            if(Value % (i+2) == 0) return i+2;
+        }
+
+        return Value;
+    }
+
+    long long MaxPrimeDivisor() {
+        long long divisor = 1;
+        while(Value != 1) {
+            divisor = MinPrimeDivisor();
+            Value /= divisor;
+        }
+
+        return divisor;
+    }
 
     void HandleWakeup() {
-        // calc Max Prime Devisor
-        long value  = Value * 10;
+        LastTime = TInstant::Now();
+
+        // test value 2599637576529873421
+        long long value  = MaxPrimeDivisor();
+        // Cout << "max divisor " << value << Endl;
 
         Send(Writer, std::make_unique<TEvents::TEvWriteValueRequest>(value));
         Send(Reader, std::make_unique<TEvents::TEvDone>());
@@ -158,7 +192,7 @@ private:
     });
 
 public:
-    TMaximumPrimeDevisorActor(long value, NActors::TActorId reader, NActors::TActorId writer) 
+    TMaximumPrimeDivisorActor(long long value, NActors::TActorId reader, NActors::TActorId writer) 
         : Value(value), Reader(reader), Writer(writer) {}
 
     void Bootstrap() {
@@ -167,8 +201,8 @@ public:
     }
 };
 
-NActors::IActor* CreateMaximumPrimeDevisorActor(long& value, NActors::TActorId reader, NActors::TActorId writer) {
-    return new TMaximumPrimeDevisorActor(value, reader, writer);
+NActors::IActor* CreateMaximumPrimeDivisorActor(long long& value, NActors::TActorId reader, NActors::TActorId writer) {
+    return new TMaximumPrimeDivisorActor(value, reader, writer);
 }
 
 /*
@@ -192,7 +226,7 @@ TWriteActor
 
 class TWriteActor : public NActors::TActor<TWriteActor> {
 private:
-    long sum;
+    long long sum;
 
     void WriteValueHandle(TEvents::TEvWriteValueRequest::TPtr &ev) {
         sum += ev->Get()->value;

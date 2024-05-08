@@ -7,6 +7,6 @@
 
 THolder<NActors::IActor> CreateReadActor(NActors::TActorId writer);
 THolder<NActors::IActor> CreateWriteActor();
-NActors::IActor* CreateMaximumPrimeDevisorActor(long& value, NActors::TActorId reader, NActors::TActorId writer);
+NActors::IActor* CreateMaximumPrimeDivisorActor(long long& value, NActors::TActorId reader, NActors::TActorId writer);
 
 std::shared_ptr<TProgramShouldContinue> GetProgramShouldContinue();

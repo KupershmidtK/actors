@@ -15,8 +15,8 @@ struct TEvents {
     };
 
     struct TEvWriteValueRequest: public NActors::TEventLocal<TEvWriteValueRequest, LabEvents::WriteValueRequest> {
-        long value;
+        long long value;
 
-        TEvWriteValueRequest(long& v) : value(v) {}
+        TEvWriteValueRequest(long long& v) : value(v) {}
     };   
 };
