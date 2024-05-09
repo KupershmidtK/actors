@@ -128,6 +128,7 @@ TMaximumPrimeDevisorActor
 */
 
 // TODO: напишите реализацию TMaximumPrimeDevisorActor
+ #define MAX_CALC_DURATION 10
 
 class TMaximumPrimeDivisorActor : public NActors::TActorBootstrapped<TMaximumPrimeDivisorActor> {
 private:
@@ -135,12 +136,14 @@ private:
     NActors::TActorId Reader;
     NActors::TActorId Writer;
 
+    bool BreakFlag;
     TInstant LastTime;
+    long long DivisorCounter;
 
     bool CheckDuration() {
         auto now = TInstant::Now();
         TDuration delta = now - LastTime;
-        return delta < TDuration::MilliSeconds(10);
+        return delta.MilliSeconds() >= MAX_CALC_DURATION;
     }
 
     long long MinPrimeDivisor() {
@@ -149,9 +152,12 @@ private:
         if (Value % 3 == 0) return 3;
 
         long long bound = (long long) sqrt(Value);
-        for (long long i = 5; i <= bound; i += 6) {
-            if(Value % i == 0) return i;
-            if(Value % (i+2) == 0) return i+2;
+        for ( ; DivisorCounter <= bound; DivisorCounter += 6) {
+            if(Value % DivisorCounter == 0) return DivisorCounter;
+            if(Value % (DivisorCounter+2) == 0) return DivisorCounter+2;
+
+            BreakFlag = CheckDuration();
+            if (BreakFlag) return 1;
         }
 
         return Value;
@@ -161,7 +167,10 @@ private:
         long long divisor = 1;
         while(Value != 1) {
             divisor = MinPrimeDivisor();
+            if(BreakFlag) return 1;
+
             Value /= divisor;
+            DivisorCounter = 5;
         }
 
         return divisor;
@@ -169,14 +178,18 @@ private:
 
     void HandleWakeup() {
         LastTime = TInstant::Now();
+        BreakFlag = false;
 
         // test value 2599637576529873421
         long long value  = MaxPrimeDivisor();
-        // Cout << "max divisor " << value << Endl;
 
-        Send(Writer, std::make_unique<TEvents::TEvWriteValueRequest>(value));
-        Send(Reader, std::make_unique<TEvents::TEvDone>());
-        PassAway();
+        if (BreakFlag) {
+            Send(SelfId(), std::make_unique<NActors::TEvents::TEvWakeup>());
+        } else {
+            Send(Writer, std::make_unique<TEvents::TEvWriteValueRequest>(value));
+            Send(Reader, std::make_unique<TEvents::TEvDone>());
+            PassAway();
+        }
     }
 
     // STFUNC(StateFunc) {
@@ -193,7 +206,9 @@ private:
 
 public:
     TMaximumPrimeDivisorActor(long long value, NActors::TActorId reader, NActors::TActorId writer) 
-        : Value(value), Reader(reader), Writer(writer) {}
+        : Value(value), Reader(reader), Writer(writer) {
+            DivisorCounter = 5;
+        }
 
     void Bootstrap() {
         Become(&TThis::StateFunc);
@@ -263,7 +278,7 @@ THolder<NActors::IActor> CreateWriteActor() {
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-
+/*
 class TSelfPingActor : public NActors::TActorBootstrapped<TSelfPingActor> {
     TDuration Latency;
     TInstant LastTime;
@@ -296,6 +311,7 @@ public:
 THolder<NActors::IActor> CreateSelfPingActor(const TDuration& latency) {
     return MakeHolder<TSelfPingActor>(latency);
 }
+*/
 
 std::shared_ptr<TProgramShouldContinue> GetProgramShouldContinue() {
     return ShouldContinue;
